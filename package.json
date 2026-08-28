@@ -16,7 +16,7 @@
   "dependencies": {
     "discord.js": "^14.14.1",
     "dotenv": "^16.4.5",
-    "mcstatus.js": "^2.4.1"
+    "mcstatus.js": "^2.0.0"
   },
   "engines": {
     "node": ">=18.0.0"
