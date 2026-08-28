@@ -1,0 +1,24 @@
+{
+  "name": "bot-minecraft-discord",
+  "version": "1.0.0",
+  "description": "Bot de Discord para monitorear estado de servidor de Minecraft y dar la bienvenida a usuarios",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "keywords": [
+    "discord",
+    "minecraft",
+    "bot"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "discord.js": "^14.14.1",
+    "dotenv": "^16.4.5",
+    "mcstatus.js": "^2.4.1"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
