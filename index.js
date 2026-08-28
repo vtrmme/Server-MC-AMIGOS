@@ -1,6 +1,6 @@
 require('dotenv').config();
-const { Client, GatewayIntentBits, ActivityType, EmbedBuilder } = require('discord.js');
-const { statusJava } = require('mcstatus.js');
+const { Client, GatewayIntentBits, ActivityType, EmbedBuilder, Events } = require('discord.js');
+const util = require('minecraft-server-util');
 const http = require('http');
 
 const client = new Client({
@@ -13,7 +13,8 @@ const client = new Client({
 
 let lastServerStatus = null;
 
-client.once('ready', () => {
+// Usamos Events.ClientReady para evitar el DeprecationWarning
+client.once(Events.ClientReady, () => {
     console.log(`🤖 Bot conectado exitosamente como: ${client.user.tag}`);
     console.log('📡 Monitoreando servidor de Minecraft...');
     
@@ -21,7 +22,7 @@ client.once('ready', () => {
     setInterval(checkMinecraftServer, 60000);
 });
 
-client.on('guildMemberAdd', async (member) => {
+client.on(Events.GuildMemberAdd, async (member) => {
     const welcomeMode = process.env.WELCOME_MODE || 'CHANNEL';
     const welcomeChannelId = process.env.CHANNEL_WELCOME_ID;
 
@@ -63,27 +64,24 @@ async function checkMinecraftServer() {
 
     try {
         console.log(`🔎 Intentando conectar a Minecraft: ${host}:${port}...`);
-        const response = await statusJava(host, port);
-        const isOnline = response && response.online !== false;
+        
+        // Usamos minecraft-server-util en lugar de mcstatus.js
+        const response = await util.status(host, port, { timeout: 5000 });
+        
+        // Si no lanza error (catch), el servidor está online
+        const playersOnline = response.players ? response.players.online : 0;
+        const playersMax = response.players ? response.players.max : 0;
 
-        if (isOnline) {
-            const playersOnline = response.players ? response.players.online : 0;
-            const playersMax = response.players ? response.players.max : 0;
+        console.log(`✅ Conexión exitosa. Jugadores: ${playersOnline}/${playersMax}`);
+        client.user.setActivity(`🟢 En línea (${playersOnline}/${playersMax})`, { type: ActivityType.Custom });
 
-            console.log(`✅ Conexión exitosa. Jugadores: ${playersOnline}/${playersMax}`);
-
-            client.user.setActivity(`🟢 En línea (${playersOnline}/${playersMax})`, { type: ActivityType.Custom });
-
-            if (lastServerStatus === false || lastServerStatus === null) {
-                if (lastServerStatus === false) {
-                    await sendStateChangeNotice(statusChannelId, true, playersOnline, playersMax);
-                }
-                lastServerStatus = true;
+        if (lastServerStatus === false || lastServerStatus === null) {
+            if (lastServerStatus === false) {
+                await sendStateChangeNotice(statusChannelId, true, playersOnline, playersMax);
             }
-        } else {
-            console.log('⚠️ Respuesta recibida pero el servidor figura como offline.');
-            await setOfflineState(statusChannelId);
+            lastServerStatus = true;
         }
+        
     } catch (error) {
         console.log(`❌ Error al conectar con Minecraft: ${error.message}`);
         await setOfflineState(statusChannelId);
