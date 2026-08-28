@@ -3,28 +3,24 @@ const { Client, GatewayIntentBits, ActivityType, EmbedBuilder } = require('disco
 const { statusJava } = require('mcstatus.js');
 const http = require('http');
 
-// Creación del cliente de Discord con permisos necesarios
 const client = new Client({
     intents: [
         GatewayIntentBits.Guilds,
-        GatewayIntentBits.GuildMembers, // Requerido para eventos de bienvenida
+        GatewayIntentBits.GuildMembers,
         GatewayIntentBits.GuildMessages
     ]
 });
 
-// Guardar el estado previo para solo enviar mensajes al cambiar
 let lastServerStatus = null;
 
 client.once('ready', () => {
     console.log(`🤖 Bot conectado exitosamente como: ${client.user.tag}`);
     console.log('📡 Monitoreando servidor de Minecraft...');
     
-    // Comprobar estado de inmediato y luego cada 60 segundos
     checkMinecraftServer();
     setInterval(checkMinecraftServer, 60000);
 });
 
-// Evento: Nuevo usuario se une al servidor
 client.on('guildMemberAdd', async (member) => {
     const welcomeMode = process.env.WELCOME_MODE || 'CHANNEL';
     const welcomeChannelId = process.env.CHANNEL_WELCOME_ID;
@@ -55,7 +51,6 @@ client.on('guildMemberAdd', async (member) => {
     }
 });
 
-// Función para revisar el estado del servidor de Minecraft
 async function checkMinecraftServer() {
     const host = process.env.MC_HOST;
     const port = parseInt(process.env.MC_PORT) || 25565;
@@ -67,6 +62,7 @@ async function checkMinecraftServer() {
     }
 
     try {
+        console.log(`🔎 Intentando conectar a Minecraft: ${host}:${port}...`);
         const response = await statusJava(host, port);
         const isOnline = response && response.online !== false;
 
@@ -74,10 +70,10 @@ async function checkMinecraftServer() {
             const playersOnline = response.players ? response.players.online : 0;
             const playersMax = response.players ? response.players.max : 0;
 
-            // Actualizar presencia del bot
+            console.log(`✅ Conexión exitosa. Jugadores: ${playersOnline}/${playersMax}`);
+
             client.user.setActivity(`🟢 En línea (${playersOnline}/${playersMax})`, { type: ActivityType.Custom });
 
-            // Notificar cambio de APAGADO a ENCENDIDO
             if (lastServerStatus === false || lastServerStatus === null) {
                 if (lastServerStatus === false) {
                     await sendStateChangeNotice(statusChannelId, true, playersOnline, playersMax);
@@ -85,14 +81,15 @@ async function checkMinecraftServer() {
                 lastServerStatus = true;
             }
         } else {
+            console.log('⚠️ Respuesta recibida pero el servidor figura como offline.');
             await setOfflineState(statusChannelId);
         }
     } catch (error) {
+        console.log(`❌ Error al conectar con Minecraft: ${error.message}`);
         await setOfflineState(statusChannelId);
     }
 }
 
-// Cambiar estado a Offline y notificar caída si aplica
 async function setOfflineState(channelId) {
     client.user.setActivity('🔴 Servidor apagado', { type: ActivityType.Custom });
 
@@ -102,10 +99,12 @@ async function setOfflineState(channelId) {
     lastServerStatus = false;
 }
 
-// Enviar Embed al canal de estado
 async function sendStateChangeNotice(channelId, isOnline, onlinePlayers = 0, maxPlayers = 0) {
     const channel = client.channels.cache.get(channelId);
-    if (!channel) return;
+    if (!channel) {
+        console.log(`⚠️ No se pudo enviar el mensaje Embed. Revisa el CHANNEL_STATUS_ID (${channelId})`);
+        return;
+    }
 
     if (isOnline) {
         const embed = new EmbedBuilder()
@@ -119,6 +118,7 @@ async function sendStateChangeNotice(channelId, isOnline, onlinePlayers = 0, max
             .setTimestamp();
 
         await channel.send({ embeds: [embed] });
+        console.log('📢 Mensaje de SERVIDOR ENCENDIDO enviado correctamente al canal.');
     } else {
         const embed = new EmbedBuilder()
             .setColor('#FF0000')
@@ -127,10 +127,10 @@ async function sendStateChangeNotice(channelId, isOnline, onlinePlayers = 0, max
             .setTimestamp();
 
         await channel.send({ embeds: [embed] });
+        console.log('📢 Mensaje de SERVIDOR APAGADO enviado correctamente al canal.');
     }
 }
 
-// Servidor HTTP básico para mantener activo el Web Service gratuito de Render
 const server = http.createServer((req, res) => {
     res.writeHead(200, { 'Content-Type': 'text/plain' });
     res.end('Bot de Discord activo 24/7');
@@ -141,5 +141,4 @@ server.listen(PORT, () => {
     console.log(`🌐 Servidor HTTP activo en el puerto ${PORT}`);
 });
 
-// Conectar a Discord
 client.login(process.env.DISCORD_TOKEN);
