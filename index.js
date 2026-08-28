@@ -1,12 +1,13 @@
 require('dotenv').config();
 const { Client, GatewayIntentBits, ActivityType, EmbedBuilder } = require('discord.js');
 const { statusJava } = require('mcstatus.js');
+const http = require('http');
 
-// Crear cliente de Discord con permisos necesarios
+// Creación del cliente de Discord con permisos necesarios
 const client = new Client({
     intents: [
         GatewayIntentBits.Guilds,
-        GatewayIntentBits.GuildMembers, // Requerido para evento de bienvenida
+        GatewayIntentBits.GuildMembers, // Requerido para eventos de bienvenida
         GatewayIntentBits.GuildMessages
     ]
 });
@@ -54,7 +55,7 @@ client.on('guildMemberAdd', async (member) => {
     }
 });
 
-// Función para revisar estado del servidor de Minecraft
+// Función para revisar el estado del servidor de Minecraft
 async function checkMinecraftServer() {
     const host = process.env.MC_HOST;
     const port = parseInt(process.env.MC_PORT) || 25565;
@@ -128,6 +129,17 @@ async function sendStateChangeNotice(channelId, isOnline, onlinePlayers = 0, max
         await channel.send({ embeds: [embed] });
     }
 }
+
+// Servidor HTTP básico para mantener activo el Web Service gratuito de Render
+const server = http.createServer((req, res) => {
+    res.writeHead(200, { 'Content-Type': 'text/plain' });
+    res.end('Bot de Discord activo 24/7');
+});
+
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => {
+    console.log(`🌐 Servidor HTTP activo en el puerto ${PORT}`);
+});
 
 // Conectar a Discord
 client.login(process.env.DISCORD_TOKEN);
