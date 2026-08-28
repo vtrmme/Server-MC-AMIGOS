@@ -64,9 +64,17 @@ async function checkMinecraftServer() {
         const address = `${host}:${port}`;
         console.log(`🔎 Consultando estado de Minecraft para: ${address}...`);
         
-        // Petición a API pública segura
         const apiRes = await fetch(`https://api.mcsrvstat.us/v3/${address}`);
-        const data = await apiRes.json();
+        const text = await apiRes.text();
+
+        // Verificamos que la respuesta no esté vacía antes de convertirla a JSON
+        if (!text) {
+            console.log('⚠️ La API respondió vacío (servidor apagado o inaccesible).');
+            await setOfflineState(statusChannelId);
+            return;
+        }
+
+        const data = JSON.parse(text);
 
         if (data && data.online) {
             const playersOnline = data.players ? data.players.online : 0;
@@ -86,11 +94,10 @@ async function checkMinecraftServer() {
             await setOfflineState(statusChannelId);
         }
     } catch (error) {
-        console.log(`❌ Error al consultar la API: ${error.message}`);
+        console.log(`❌ Servidor apagado o sin respuesta (${error.message})`);
         await setOfflineState(statusChannelId);
     }
 }
-
 async function setOfflineState(channelId) {
     client.user.setActivity('🔴 Servidor apagado', { type: ActivityType.Custom });
 
