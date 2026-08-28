@@ -1,6 +1,5 @@
 require('dotenv').config();
 const { Client, GatewayIntentBits, ActivityType, EmbedBuilder, Events } = require('discord.js');
-const util = require('minecraft-server-util');
 const http = require('http');
 
 const client = new Client({
@@ -13,13 +12,12 @@ const client = new Client({
 
 let lastServerStatus = null;
 
-// Usamos Events.ClientReady para evitar el DeprecationWarning
 client.once(Events.ClientReady, () => {
     console.log(`🤖 Bot conectado exitosamente como: ${client.user.tag}`);
     console.log('📡 Monitoreando servidor de Minecraft...');
     
     checkMinecraftServer();
-    setInterval(checkMinecraftServer, 60000);
+    setInterval(checkMinecraftServer, 60000); // Consulta cada 60 segundos
 });
 
 client.on(Events.GuildMemberAdd, async (member) => {
@@ -54,7 +52,7 @@ client.on(Events.GuildMemberAdd, async (member) => {
 
 async function checkMinecraftServer() {
     const host = process.env.MC_HOST;
-    const port = parseInt(process.env.MC_PORT) || 25565;
+    const port = process.env.MC_PORT || '25565';
     const statusChannelId = process.env.CHANNEL_STATUS_ID;
 
     if (!host) {
@@ -63,27 +61,32 @@ async function checkMinecraftServer() {
     }
 
     try {
-        console.log(`🔎 Intentando conectar a Minecraft: ${host}:${port}...`);
+        const address = `${host}:${port}`;
+        console.log(`🔎 Consultando estado de Minecraft para: ${address}...`);
         
-        // Usamos minecraft-server-util en lugar de mcstatus.js
-        const response = await util.status(host, port, { timeout: 5000 });
-        
-        // Si no lanza error (catch), el servidor está online
-        const playersOnline = response.players ? response.players.online : 0;
-        const playersMax = response.players ? response.players.max : 0;
+        // Petición a API pública segura
+        const apiRes = await fetch(`https://api.mcsrvstat.us/v3/${address}`);
+        const data = await apiRes.json();
 
-        console.log(`✅ Conexión exitosa. Jugadores: ${playersOnline}/${playersMax}`);
-        client.user.setActivity(`🟢 En línea (${playersOnline}/${playersMax})`, { type: ActivityType.Custom });
+        if (data && data.online) {
+            const playersOnline = data.players ? data.players.online : 0;
+            const playersMax = data.players ? data.players.max : 0;
 
-        if (lastServerStatus === false || lastServerStatus === null) {
-            if (lastServerStatus === false) {
-                await sendStateChangeNotice(statusChannelId, true, playersOnline, playersMax);
+            console.log(`✅ Conexión exitosa. Jugadores: ${playersOnline}/${playersMax}`);
+            client.user.setActivity(`🟢 En línea (${playersOnline}/${playersMax})`, { type: ActivityType.Custom });
+
+            if (lastServerStatus === false || lastServerStatus === null) {
+                if (lastServerStatus === false) {
+                    await sendStateChangeNotice(statusChannelId, true, playersOnline, playersMax);
+                }
+                lastServerStatus = true;
             }
-            lastServerStatus = true;
+        } else {
+            console.log('⚠️ El servidor de Minecraft figura como apagado/offline.');
+            await setOfflineState(statusChannelId);
         }
-        
     } catch (error) {
-        console.log(`❌ Error al conectar con Minecraft: ${error.message}`);
+        console.log(`❌ Error al consultar la API: ${error.message}`);
         await setOfflineState(statusChannelId);
     }
 }
