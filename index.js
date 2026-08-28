@@ -17,7 +17,7 @@ client.once(Events.ClientReady, () => {
     console.log('📡 Monitoreando servidor de Minecraft...');
     
     checkMinecraftServer();
-    setInterval(checkMinecraftServer, 60000); // Consulta cada 60 segundos
+    setInterval(checkMinecraftServer, 60000);
 });
 
 client.on(Events.GuildMemberAdd, async (member) => {
@@ -62,21 +62,12 @@ async function checkMinecraftServer() {
 
     try {
         const address = `${host}:${port}`;
-        console.log(`🔎 Consultando estado de Minecraft para: ${address}...`);
+        console.log(`🔎 Consultando API de mcstatus.io para: ${address}...`);
         
-        const apiRes = await fetch(`https://api.mcsrvstat.us/v3/${address}`);
-        const text = await apiRes.text();
+        const apiRes = await fetch(`https://api.mcstatus.io/v2/status/java/${address}`);
+        const data = await apiRes.json();
 
-        // Verificamos que la respuesta no esté vacía antes de convertirla a JSON
-        if (!text) {
-            console.log('⚠️ La API respondió vacío (servidor apagado o inaccesible).');
-            await setOfflineState(statusChannelId);
-            return;
-        }
-
-        const data = JSON.parse(text);
-
-        if (data && data.online) {
+        if (data && data.online === true) {
             const playersOnline = data.players ? data.players.online : 0;
             const playersMax = data.players ? data.players.max : 0;
 
@@ -90,14 +81,15 @@ async function checkMinecraftServer() {
                 lastServerStatus = true;
             }
         } else {
-            console.log('⚠️ El servidor de Minecraft figura como apagado/offline.');
+            console.log('⚠️ El servidor de Minecraft figura como apagado o la API no lo encontró.');
             await setOfflineState(statusChannelId);
         }
     } catch (error) {
-        console.log(`❌ Servidor apagado o sin respuesta (${error.message})`);
+        console.log(`❌ Error al conectar con la API: ${error.message}`);
         await setOfflineState(statusChannelId);
     }
 }
+
 async function setOfflineState(channelId) {
     client.user.setActivity('🔴 Servidor apagado', { type: ActivityType.Custom });
 
